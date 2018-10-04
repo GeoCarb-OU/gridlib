@@ -64,7 +64,7 @@ class DataGrid(object):
         return self.data_grids[varname]
     
         
-    def plot(self, to_show = True, title = None, figsize = (7, 5), cmaps = {}):
+    def plot(self, to_show = True, title = None, figsize = (8, 6), cmaps = {}):
         
         cmaps_real = {'n_samples' : 'Blues'}
         cmaps_real.update(cmaps)
@@ -151,7 +151,7 @@ class DataGrid(object):
                  new_shape[1], arr.shape[1] // new_shape[1])
         return func(func(arr.reshape(shape), axis = -1), axis = 1)
     
-    # -- Operators --
+    # -- Util Funcs --
     
     def copy(self):
         new_grids = dict((varname, self.data_grids[varname].copy()) for varname in self.data_grids)
@@ -161,26 +161,60 @@ class DataGrid(object):
                           new_grids,
                           pixel_size = self.pixel_size)
     
-#     def _check_compatible(self, other, all_vars = True, strict = True):
+    def __getitem__(self, varname):
+        return self.data_grids[varname]
+    
+    # -- Operators --
+    
+    def _check_compatible(self, other, all_vars = True, strict = False):
         
-#         if isinstance(other, dict):
-            
-#         elif isinstance(other, DataGrid):
+        if isinstance(other, DataGrid):
         
-#             assert self.pixel_size == other.pixel_size, "Incompatible pixel sizes %s and %s; try downscaling" % (self.pixel_size, other.pixel_size)
+            assert self.pixel_size == other.pixel_size, "Incompatible pixel sizes %s and %s; try downscaling" % (self.pixel_size, other.pixel_size)
 
-#             if strict:
-#                 assert np.all(self.grid_lat == other.grid_lat), "Incomaptible latitude grid"
-#                 assert np.all(self.grid_lon == other.grid_lon), "Incomaptible longitude grid"
+            if strict:
+                assert np.all(self.grid_lat == other.grid_lat), "Incomaptible latitude grid"
+                assert np.all(self.grid_lon == other.grid_lon), "Incomaptible longitude grid"
 
-#             if all_vars:
-#                 assert set(self.data_grids.keys()) == set(other.data_grids.keys())
+            if all_vars:
+                assert set(self.data_grids.keys()) == set(other.data_grids.keys())
                 
-#         else:
-#             raise TypeError("DataGrid cannot do arithmetic with ")
+        else:
+            raise TypeError("DataGrid cannot do arithmetic with ")
     
-#     def _do_grid_ufunc_inplace(self, other, ufunc):
-#         pass
+    def _do_grid_func(self, other, func):
+        self._check_compatible(self, other)
+        
+        for varname in self.data_grids:
+            grid = self.data_grids[varname]
+            hasdata = ~np.isnan(grid)
+            getattr(grid[hasdata], func)(other[varname][hasdata])
+            grid[~hasdata] = other[varname][~hasdata]
     
-#     def __iadd__(self, other):
+    def __iadd__(self, other):
+        return self._do_grid_func(self, other, "__iadd__")
+    def __isub__(self, other):
+        return self._do_grid_func(self, other, "__isub__")
+    def __imul__(self, other):
+        return self._do_grid_func(self, other, "__imul__")
+    def __idiv__(self, other):
+        return self._do_grid_func(self, other, "__idiv__")
+    
+    def __add__(self, other):
+        out = self.copy()
+        out.__iadd__(other)
+        return out
+    def __sub__(self, other):
+        out = self.copy()
+        out.__isub__(other)
+        return out
+    def __mul__(self, other):
+        out = self.copy()
+        out.__imul__(other)
+        return out
+    def __div__(self, other):
+        out = self.copy()
+        out.__idiv__(other)
+        return out
+            
         
