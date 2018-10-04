@@ -45,13 +45,12 @@ class DataGrid(object):
             
         grids['n_samples'] = (~np.isnan(grids[varname])).astype(int)
 
-        out = kls(grid_lat, grid_lon, grids, pixel_size, cmaps = {'n_samples' : 'Blues'}, **kwargs)
-        out.downsampling_functions['n_samples'] = np.nansum
+        out = kls(grid_lat, grid_lon, grids, pixel_size, **kwargs)
     
         return out
     
     
-    def __init__(self, lat_grid, lon_grid, grids, pixel_size, pretty_names = {}, cmaps = {}):
+    def __init__(self, lat_grid, lon_grid, grids, pixel_size, pretty_names = {}):
         self.grid_lat = lat_grid
         self.grid_lon = lon_grid
         self.data_grids = grids
@@ -59,15 +58,17 @@ class DataGrid(object):
         self.pixel_size = pixel_size
         
         self.pretty_names = pretty_names
-        self.cmaps = cmaps
-        
-        self.downsampling_functions = {}
+       
         
     def __getattr__(self, varname):
         return self.data_grids[varname]
+    
         
+    def plot(self, to_show = True, title = None, figsize = (7, 5), cmaps = {}):
         
-    def plot(self, to_show = True, title = None, figsize = (7, 5)):
+        cmaps_real = {'n_samples' : 'Blues'}
+        cmaps_real.update(cmaps)
+        
         if to_show is True:
             to_show = self.data_grids.keys()
         
@@ -83,9 +84,9 @@ class DataGrid(object):
                                    self.grid_lat, 
                                    self.data_grids[varname], 
                                    transform = ccrs.PlateCarree(),
-                                   cmap = self.cmaps.get(varname, 'plasma'))
+                                   cmap = cmaps_real.get(varname, 'plasma'))
             
-            axs[i].coastlines()
+            axs[i].coastlines()   
             axs[i].set_title(self.pretty_names.get(varname, varname))
             
             fig.colorbar(im, ax = axs[i], fraction = 0.04)
@@ -104,7 +105,14 @@ class DataGrid(object):
         
         return fig    
         
-    def downscale(self, downscale_coeffs = (8, 8)):
+        
+    def downscale(self, 
+                  downscale_coeffs = (8, 8),
+                  downsampling_functions = {}):
+        
+        dsfuncs = {'n_samples' : np.nansum}
+        dsfuncs.update(downsampling_functions)
+        
         new_shape = np.divide(self.grid_dim, downscale_coeffs).astype(int)
 
         import warnings
@@ -117,7 +125,7 @@ class DataGrid(object):
             for varname in self.data_grids:
                 grids_downscaled[varname] = DataGrid._rebin(self.data_grids[varname], 
                                                             new_shape,
-                                                            func = self.downsampling_functions.get(varname, np.nanmean))
+                                                            func = dsfuncs.get(varname, np.nanmean))
             
 
         downscaled_pixel_size = np.multiply(self.pixel_size, downscale_coeffs)
@@ -129,9 +137,6 @@ class DataGrid(object):
                           grid_lon_down, 
                           grids_downscaled,
                           pixel_size = downscaled_pixel_size)
-        
-        out.downsampling_functions = self.downsampling_functions
-        out.cmaps = self.cmaps
         
         return out
         
@@ -147,3 +152,35 @@ class DataGrid(object):
         return func(func(arr.reshape(shape), axis = -1), axis = 1)
     
     # -- Operators --
+    
+    def copy(self):
+        new_grids = dict((varname, self.data_grids[varname].copy()) for varname in self.data_grids)
+        
+        return type(self)(self.grid_lat.copy(),
+                          self.grid_lon.copy(),
+                          new_grids,
+                          pixel_size = self.pixel_size)
+    
+#     def _check_compatible(self, other, all_vars = True, strict = True):
+        
+#         if isinstance(other, dict):
+            
+#         elif isinstance(other, DataGrid):
+        
+#             assert self.pixel_size == other.pixel_size, "Incompatible pixel sizes %s and %s; try downscaling" % (self.pixel_size, other.pixel_size)
+
+#             if strict:
+#                 assert np.all(self.grid_lat == other.grid_lat), "Incomaptible latitude grid"
+#                 assert np.all(self.grid_lon == other.grid_lon), "Incomaptible longitude grid"
+
+#             if all_vars:
+#                 assert set(self.data_grids.keys()) == set(other.data_grids.keys())
+                
+#         else:
+#             raise TypeError("DataGrid cannot do arithmetic with ")
+    
+#     def _do_grid_ufunc_inplace(self, other, ufunc):
+#         pass
+    
+#     def __iadd__(self, other):
+        
