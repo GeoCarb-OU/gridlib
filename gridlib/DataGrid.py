@@ -9,39 +9,66 @@ class DataGrid(object):
     @classmethod
     def from_nc4(kls, file, varnames, latname = 'latitude', lonname = 'longitude', **kwargs):
         
+        def get_for_key(grp, key):
+            if isinstance(key, tuple):
+                if len(key) == 1:
+                    return np.asarray(grp[key[0]])
+                else:
+                    return get_for_key(grp[key[0]], key[1:])
+            else:
+                return np.asarray(grp[key])
+        
         with netCDF4.Dataset(file) as rgrp:
-            return kls.from_points(np.asarray(rgrp.variables[latname]),
-                                   np.asarray(rgrp.variables[lonname]),
-                                   dict((varname, np.asarray(rgrp.variables[varname])) for varname in varnames),
+            
+            return kls.from_points(get_for_key(rgrp, latname),
+                                   get_for_key(rgrp, lonname),
+                                   dict(((varname[-1] if isinstance(varname, tuple) else varname), get_for_key(rgrp, varname)) for varname in varnames),
                                    **kwargs)       
     
     
     @classmethod
-    def from_points(kls, lat, lon, data_arrs, pixel_size = np.array([0.5, 0.5]), dim_mul_of = [8, 8], **kwargs):
+    def from_points(kls, lat, lon, data_arrs, 
+                    pixel_size = np.array([0.5, 0.5]), 
+                    dim_mul_of = [1, 1], 
+                    origin = None,
+                    grid_dimensions = None,
+                    **kwargs):
         """Construct a grid from a list of coordinates and data points.
         
         ASSUMES that there is only one data point in each pixel; chooses the last
         given value for a pixel if more than one.
         """
+        pixel_size = np.asarray(pixel_size)
+        grid_dimensions = np.asarray(grid_dimensions, dtype = np.float)
         
         mins = np.array([np.min(lat), np.min(lon)])
         maxes = np.array([np.max(lat), np.max(lon)])
         grid_dim = np.ceil((maxes - mins) / pixel_size)
         grid_dim = dim_mul_of * np.ceil(grid_dim / dim_mul_of)
         
+        if not grid_dimensions is None:
+            assert np.all(grid_dimensions >= grid_dim), "Provided grid dimensions of %s smaller than data grid size of %s" % (grid_dimensions, grid_dim)
+            
+            grid_dim = grid_dimensions
+                
+        if origin is None:
+            orgin = mins
+        else:
+            assert np.all(origin <= mins), "Provided origin %s larger than data mins %s" % (origin, mins)
+        
         grid_lat, grid_lon = np.mgrid[0:grid_dim[0], 0:grid_dim[1]]
         grid_lat *= pixel_size[0]
         grid_lon *= pixel_size[1]
 
-        grid_lat += mins[0] - 0.5 * pixel_size[0]
-        grid_lon += mins[1] - 0.5 * pixel_size[1]
+        grid_lat += origin[0] - 0.5 * pixel_size[0]
+        grid_lon += origin[1] - 0.5 * pixel_size[1]
         
         grids = {}
         
         for varname in data_arrs:
             grids[varname] = np.full(grid_lat.shape, np.nan, dtype = np.float)
-            grids[varname][np.floor((lat - mins[0]) / pixel_size[0]).astype(int), 
-                           np.floor((lon - mins[1]) / pixel_size[1]).astype(int)] = data_arrs[varname]
+            grids[varname][np.floor((lat - origin[0]) / pixel_size[0]).astype(int), 
+                           np.floor((lon - origin[1]) / pixel_size[1]).astype(int)] = data_arrs[varname]
             
         grids['n_samples'] = (~np.isnan(grids[varname])).astype(int)
 
@@ -64,13 +91,16 @@ class DataGrid(object):
         return self.data_grids[varname]
     
         
-    def plot(self, to_show = True, title = None, figsize = (8, 6), cmaps = {}):
+    def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}):
         
         cmaps_real = {'n_samples' : 'Blues'}
         cmaps_real.update(cmaps)
         
-        if to_show is True:
+        if to_show is None:
             to_show = self.data_grids.keys()
+            
+        if not to_hide is None:
+            to_show = list(set(to_show) - set(to_hide))
         
         fig, axs = plt.subplots(
                         int(np.ceil(len(to_show) / 2)), 2,
@@ -104,7 +134,14 @@ class DataGrid(object):
         ))
         
         return fig    
-        
+       
+
+    def add_variable(self,
+                     varname,
+                     data):
+        assert data.shape == self.grid_lat.shape, "Data has wrong shape %s" % data.shape
+
+        self.data_grids[varname] = data
         
     def downscale(self, 
                   downscale_coeffs = (8, 8),
@@ -170,7 +207,7 @@ class DataGrid(object):
         
         if isinstance(other, DataGrid):
         
-            assert self.pixel_size == other.pixel_size, "Incompatible pixel sizes %s and %s; try downscaling" % (self.pixel_size, other.pixel_size)
+            assert np.all(self.pixel_size == other.pixel_size), "Incompatible pixel sizes %s and %s; try downscaling" % (self.pixel_size, other.pixel_size)
 
             if strict:
                 assert np.all(self.grid_lat == other.grid_lat), "Incomaptible latitude grid"
@@ -188,17 +225,19 @@ class DataGrid(object):
         for varname in self.data_grids:
             grid = self.data_grids[varname]
             hasdata = ~np.isnan(grid)
-            getattr(grid[hasdata], func)(other[varname][hasdata])
+            grid[hasdata] = getattr(grid[hasdata], func)(other[varname][hasdata])
             grid[~hasdata] = other[varname][~hasdata]
+            
+        return self
     
     def __iadd__(self, other):
-        return self._do_grid_func(self, other, "__iadd__")
+        return self._do_grid_func(other, "__iadd__")
     def __isub__(self, other):
-        return self._do_grid_func(self, other, "__isub__")
+        return self._do_grid_func(other, "__isub__")
     def __imul__(self, other):
-        return self._do_grid_func(self, other, "__imul__")
+        return self._do_grid_func(other, "__imul__")
     def __idiv__(self, other):
-        return self._do_grid_func(self, other, "__idiv__")
+        return self._do_grid_func(other, "__idiv__")
     
     def __add__(self, other):
         out = self.copy()
