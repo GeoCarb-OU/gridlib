@@ -139,6 +139,7 @@ class DataGrid(object):
     def add_variable(self,
                      varname,
                      data):
+        """Adds a new gridded variable to the DataGrid."""
         assert data.shape == self.grid_lat.shape, "Data has wrong shape %s" % data.shape
 
         self.data_grids[varname] = data
