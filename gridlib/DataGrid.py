@@ -86,9 +86,15 @@ class DataGrid(object):
         
         self.pretty_names = pretty_names
        
+    def __getitem__(self, varname):
+        return self.data_grids[varname]
         
     def __getattr__(self, varname):
         return self.data_grids[varname]
+    
+    @property
+    def gridvar_names(self):
+        return self.data_grids.keys()
     
         
     def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}):
@@ -114,7 +120,7 @@ class DataGrid(object):
                                    self.grid_lat, 
                                    self.data_grids[varname], 
                                    transform = ccrs.PlateCarree(),
-                                   cmap = cmaps_real.get(varname, 'plasma'))
+                                   cmap = cmaps_real.get(varname, 'inferno'))
             
             axs[i].coastlines()   
             axs[i].set_title(self.pretty_names.get(varname, varname))
@@ -199,8 +205,6 @@ class DataGrid(object):
                           new_grids,
                           pixel_size = self.pixel_size)
     
-    def __getitem__(self, varname):
-        return self.data_grids[varname]
     
     # -- Operators --
     
