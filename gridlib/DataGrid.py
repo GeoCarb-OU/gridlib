@@ -5,10 +5,10 @@ import netCDF4
 import cartopy.crs as ccrs
 
 class DataGrid(object):
-    
+
     @classmethod
     def from_nc4(kls, file, varnames, latname = 'latitude', lonname = 'longitude', **kwargs):
-        
+
         def get_for_key(grp, key):
             if isinstance(key, tuple):
                 if len(key) == 1:
@@ -17,130 +17,130 @@ class DataGrid(object):
                     return get_for_key(grp[key[0]], key[1:])
             else:
                 return np.asarray(grp[key])
-        
+
         with netCDF4.Dataset(file) as rgrp:
-            
+
             return kls.from_points(get_for_key(rgrp, latname),
                                    get_for_key(rgrp, lonname),
                                    dict(((varname[-1] if isinstance(varname, tuple) else varname), get_for_key(rgrp, varname)) for varname in varnames),
-                                   **kwargs)       
-    
-    
+                                   **kwargs)
+
+
     @classmethod
-    def from_points(kls, lat, lon, data_arrs, 
-                    pixel_size = np.array([0.5, 0.5]), 
-                    dim_mul_of = [1, 1], 
+    def from_points(kls, lat, lon, data_arrs,
+                    pixel_size = np.array([0.5, 0.5]),
+                    dim_mul_of = [1, 1],
                     origin = None,
                     grid_dimensions = None,
                     **kwargs):
         """Construct a grid from a list of coordinates and data points.
-        
+
         ASSUMES that there is only one data point in each pixel; chooses the last
         given value for a pixel if more than one.
         """
         pixel_size = np.asarray(pixel_size)
         grid_dimensions = np.asarray(grid_dimensions, dtype = np.float)
-        
+
         mins = np.array([np.min(lat), np.min(lon)])
         maxes = np.array([np.max(lat), np.max(lon)])
         grid_dim = np.ceil((maxes - mins) / pixel_size)
         grid_dim = dim_mul_of * np.ceil(grid_dim / dim_mul_of)
-        
+
         if not grid_dimensions is None:
             assert np.all(grid_dimensions >= grid_dim), "Provided grid dimensions of %s smaller than data grid size of %s" % (grid_dimensions, grid_dim)
-            
+
             grid_dim = grid_dimensions
-                
+
         if origin is None:
             orgin = mins
         else:
             assert np.all(origin <= mins), "Provided origin %s larger than data mins %s" % (origin, mins)
-        
+
         grid_lat, grid_lon = np.mgrid[0:grid_dim[0], 0:grid_dim[1]]
         grid_lat *= pixel_size[0]
         grid_lon *= pixel_size[1]
 
         grid_lat += origin[0] - 0.5 * pixel_size[0]
         grid_lon += origin[1] - 0.5 * pixel_size[1]
-        
+
         grids = {}
-        
+
         for varname in data_arrs:
             grids[varname] = np.full(grid_lat.shape, np.nan, dtype = np.float)
-            grids[varname][np.floor((lat - origin[0]) / pixel_size[0]).astype(int), 
+            grids[varname][np.floor((lat - origin[0]) / pixel_size[0]).astype(int),
                            np.floor((lon - origin[1]) / pixel_size[1]).astype(int)] = data_arrs[varname]
-            
+
         grids['n_samples'] = (~np.isnan(grids[varname])).astype(int)
 
         out = kls(grid_lat, grid_lon, grids, pixel_size, **kwargs)
-    
+
         return out
-    
-    
+
+
     def __init__(self, lat_grid, lon_grid, grids, pixel_size, pretty_names = {}):
         self.grid_lat = lat_grid
         self.grid_lon = lon_grid
         self.data_grids = grids
         self.grid_dim = lat_grid.shape
         self.pixel_size = pixel_size
-        
+
         self.pretty_names = pretty_names
-       
+
     def __getitem__(self, varname):
         return self.data_grids[varname]
-        
+
     def __getattr__(self, varname):
         return self.data_grids[varname]
-    
+
     @property
     def gridvar_names(self):
         return self.data_grids.keys()
-    
-        
+
+
     def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}):
-        
+
         cmaps_real = {'n_samples' : 'Blues'}
         cmaps_real.update(cmaps)
-        
+
         if to_show is None:
             to_show = self.data_grids.keys()
-            
+
         if not to_hide is None:
             to_show = list(set(to_show) - set(to_hide))
-        
+
         fig, axs = plt.subplots(
                         int(np.ceil(len(to_show) / 2)), 2,
-                        subplot_kw={'projection' : ccrs.PlateCarree()}, 
+                        subplot_kw={'projection' : ccrs.PlateCarree()},
                         figsize = figsize)
-        
+
         axs = axs.flatten()
-        
+
         for i, varname in enumerate(to_show):
             im = axs[i].pcolormesh(self.grid_lon,
-                                   self.grid_lat, 
-                                   self.data_grids[varname], 
+                                   self.grid_lat,
+                                   self.data_grids[varname],
                                    transform = ccrs.PlateCarree(),
                                    cmap = cmaps_real.get(varname, 'inferno'))
-            
-            axs[i].coastlines()   
+
+            axs[i].coastlines()
             axs[i].set_title(self.pretty_names.get(varname, varname))
-            
+
             fig.colorbar(im, ax = axs[i], fraction = 0.04)
-            
+
         if i < len(axs) - 1:
             axs[-1].set_visible(False)
-        
+
         if title is None:
             title = "Grid Data"
-            
+
         fig.suptitle("%s (%.1fkm x %.1fkm pixels, avg. %i samples/bin)" % (
             title,
             self.pixel_size[0], self.pixel_size[1],
             np.mean(self.n_samples[self.n_samples != 0])
         ))
-        
-        return fig    
-       
+
+        return fig
+
 
     def add_variable(self,
                      varname,
@@ -149,42 +149,54 @@ class DataGrid(object):
         assert data.shape == self.grid_lat.shape, "Data has wrong shape %s" % data.shape
 
         self.data_grids[varname] = data
-        
-    def downscale(self, 
+
+    def get_surface_area_grid(self, earth_radius = 6371.):
+        """
+        In km by default.
+        """
+        dtor = np.pi / 180.
+
+        out = np.sin(dtor * (self.grid_lat + self.pixel_size[0])) - np.sin(dtor * self.grid_lat) # Lat diff
+        out *= self.pixel_size[1] / 360. # Lon diff
+        out *= (2 * np.pi * earth_radius ** 2)
+
+        return out
+
+    def downscale(self,
                   downscale_coeffs = (8, 8),
                   downsampling_functions = {}):
-        
+
         dsfuncs = {'n_samples' : np.nansum}
         dsfuncs.update(downsampling_functions)
-        
+
         new_shape = np.divide(self.grid_dim, downscale_coeffs).astype(int)
 
         import warnings
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message = "Mean of empty slice")
-            
+
             grids_downscaled = {}
-            
+
             for varname in self.data_grids:
-                grids_downscaled[varname] = DataGrid._rebin(self.data_grids[varname], 
+                grids_downscaled[varname] = DataGrid._rebin(self.data_grids[varname],
                                                             new_shape,
                                                             func = dsfuncs.get(varname, np.nanmean))
-            
+
 
         downscaled_pixel_size = np.multiply(self.pixel_size, downscale_coeffs)
-        
+
         grid_lat_down = self.grid_lat[::downscale_coeffs[0], ::downscale_coeffs[1]]
         grid_lon_down = self.grid_lon[::downscale_coeffs[0], ::downscale_coeffs[1]]
-        
-        out =  type(self)(grid_lat_down, 
-                          grid_lon_down, 
+
+        out =  type(self)(grid_lat_down,
+                          grid_lon_down,
                           grids_downscaled,
                           pixel_size = downscaled_pixel_size)
-        
+
         return out
-        
-        
+
+
     # https://scipython.com/blog/binning-a-2d-array-in-numpy/
     @staticmethod
     def _rebin(arr, new_shape, func = np.nanmean):
@@ -194,24 +206,24 @@ class DataGrid(object):
         shape = (new_shape[0], arr.shape[0] // new_shape[0],
                  new_shape[1], arr.shape[1] // new_shape[1])
         return func(func(arr.reshape(shape), axis = -1), axis = 1)
-    
+
     # -- Util Funcs --
-    
+
     def copy(self):
         new_grids = dict((varname, self.data_grids[varname].copy()) for varname in self.data_grids)
-        
+
         return type(self)(self.grid_lat.copy(),
                           self.grid_lon.copy(),
                           new_grids,
                           pixel_size = self.pixel_size)
-    
-    
+
+
     # -- Operators --
-    
+
     def _check_compatible(self, other, all_vars = True, strict = False):
-        
+
         if isinstance(other, DataGrid):
-        
+
             assert np.all(self.pixel_size == other.pixel_size), "Incompatible pixel sizes %s and %s; try downscaling" % (self.pixel_size, other.pixel_size)
 
             if strict:
@@ -220,21 +232,21 @@ class DataGrid(object):
 
             if all_vars:
                 assert set(self.data_grids.keys()) == set(other.data_grids.keys())
-                
+
         else:
             raise TypeError("DataGrid cannot do arithmetic with ")
-    
+
     def _do_grid_func(self, other, func):
         self._check_compatible(self, other)
-        
+
         for varname in self.data_grids:
             grid = self.data_grids[varname]
             hasdata = ~np.isnan(grid)
             grid[hasdata] = getattr(grid[hasdata], func)(other[varname][hasdata])
             grid[~hasdata] = other[varname][~hasdata]
-            
+
         return self
-    
+
     def __iadd__(self, other):
         return self._do_grid_func(other, "__iadd__")
     def __isub__(self, other):
@@ -243,7 +255,7 @@ class DataGrid(object):
         return self._do_grid_func(other, "__imul__")
     def __idiv__(self, other):
         return self._do_grid_func(other, "__idiv__")
-    
+
     def __add__(self, other):
         out = self.copy()
         out.__iadd__(other)
@@ -260,5 +272,3 @@ class DataGrid(object):
         out = self.copy()
         out.__idiv__(other)
         return out
-            
-        
