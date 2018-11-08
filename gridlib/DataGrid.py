@@ -27,9 +27,14 @@ class DataGrid(object):
                                   dict(((varname[-1] if isinstance(varname, tuple) else varname), get_for_key(rgrp, varname)) for varname in varnames),
                                   **kwargs)
         finally:
+<<<<<<< HEAD
             if rgrp is not None:
                 rgrp.close()
             del rgrp
+=======
+            if not rgrp is None:
+                rgrp.close()
+>>>>>>> ab4658c75bd9b1731845837662f72a3171f8468b
 
         return out
 
