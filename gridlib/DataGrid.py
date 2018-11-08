@@ -18,6 +18,7 @@ class DataGrid(object):
             else:
                 return np.asarray(grp[key])
 
+        rgrp = None
         try:
             rgrp = netCDF4.Dataset(file)
 
@@ -28,7 +29,8 @@ class DataGrid(object):
 
             del rgrp
         finally:
-            rgrp.close()
+            if not rgrp is None:
+                rgrp.close()
 
         return out
 
