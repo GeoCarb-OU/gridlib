@@ -18,17 +18,18 @@ class DataGrid(object):
             else:
                 return np.asarray(grp[key])
 
+        rgrp = None
         try:
             rgrp = netCDF4.Dataset(file)
 
             out = kls.from_points(get_for_key(rgrp, latname),
-                                   get_for_key(rgrp, lonname),
-                                   dict(((varname[-1] if isinstance(varname, tuple) else varname), get_for_key(rgrp, varname)) for varname in varnames),
-                                   **kwargs)
-
-            del rgrp
+                                  get_for_key(rgrp, lonname),
+                                  dict(((varname[-1] if isinstance(varname, tuple) else varname), get_for_key(rgrp, varname)) for varname in varnames),
+                                  **kwargs)
         finally:
-            rgrp.close()
+            if rgrp is not None:
+                rgrp.close()
+            del rgrp
 
         return out
 
