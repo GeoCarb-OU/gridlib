@@ -133,7 +133,7 @@ class DataGrid(object):
         if title is None:
             title = "Grid Data"
 
-        fig.suptitle("%s (%.1fkm x %.1fkm pixels, avg. %i samples/bin)" % (
+        fig.suptitle("%s (%.1fdeg x %.1fdeg pixels, avg. %i samples/bin)" % (
             title,
             self.pixel_size[0], self.pixel_size[1],
             np.mean(self.n_samples[self.n_samples != 0])
