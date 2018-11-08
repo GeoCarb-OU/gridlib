@@ -18,12 +18,19 @@ class DataGrid(object):
             else:
                 return np.asarray(grp[key])
 
-        with netCDF4.Dataset(file) as rgrp:
+        try:
+            rgrp = netCDF4.Dataset(file)
 
-            return kls.from_points(get_for_key(rgrp, latname),
+            out = kls.from_points(get_for_key(rgrp, latname),
                                    get_for_key(rgrp, lonname),
                                    dict(((varname[-1] if isinstance(varname, tuple) else varname), get_for_key(rgrp, varname)) for varname in varnames),
                                    **kwargs)
+
+            del rgrp
+        finally:
+            rgrp.close()
+
+        return out
 
 
     @classmethod
