@@ -105,7 +105,7 @@ class DataGrid(object):
         return self.data_grids.keys()
 
 
-    def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}):
+    def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}, **kwargs):
 
         cmaps_real = {'n_samples' : 'Blues'}
         cmaps_real.update(cmaps)
@@ -119,7 +119,8 @@ class DataGrid(object):
         fig, axs = plt.subplots(
                         int(np.ceil(len(to_show) / 2)), 2,
                         subplot_kw={'projection' : ccrs.PlateCarree()},
-                        figsize = figsize)
+                        figsize = figsize,
+                        **kwargs)
 
         axs = axs.flatten()
 
@@ -249,8 +250,16 @@ class DataGrid(object):
 
         for varname in self.data_grids:
             grid = self.data_grids[varname]
-            hasdata = ~np.isnan(grid)
-            grid[hasdata] = getattr(grid[hasdata], func)(other[varname][hasdata])
+            othergrid = other[varname]
+            self_has_data = ~np.isnan(grid)
+            other_has_data = ~np.isnan(othergrid)
+            # If only I have data, leave it
+            # If we both have data, operation it
+            msk = self_has_data & other_has_data
+            grid[msk] = getattr(grid[msk], func)(othergrid[msk])
+            # If only other has data, take it
+            # (since I don't have anything there, taking it all, including
+            # their NaNs, doesn't change anything)
             grid[~hasdata] = other[varname][~hasdata]
 
         return self
