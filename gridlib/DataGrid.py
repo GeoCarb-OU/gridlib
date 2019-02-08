@@ -52,9 +52,9 @@ class DataGrid(object):
 
         if not (len(lat) > 0 and len(lon) > 0):
             raise EmptyDatafileError("lat and/or lon are empty!")
-        
+
         assert len(lat) == len(lon), "lat and lon have different lengths!"
-        assert all(len(d) == len(lat) for d in data_arrs), "All data arrays must have same length as number of coordinate pairs!"
+        assert all(len(data_arrs[d]) == len(lat) for d in data_arrs), "All data arrays must have same length as number of coordinate pairs!"
 
         pixel_size = np.asarray(pixel_size)
         grid_dimensions = np.asarray(grid_dimensions, dtype = np.float)
