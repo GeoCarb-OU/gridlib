@@ -46,6 +46,11 @@ class DataGrid(object):
         ASSUMES that there is only one data point in each pixel; chooses the last
         given value for a pixel if more than one.
         """
+
+        assert len(lat) > 0 and len(lon) > 0, "lat and/or lon empty, data points must be provided!"
+        assert len(lat) == len(lon), "lat and lon have different lengths!"
+        assert all(len(d) == len(lat) for d in data_arrs), "All data arrays must have same length as number of coordinate pairs!"
+
         pixel_size = np.asarray(pixel_size)
         grid_dimensions = np.asarray(grid_dimensions, dtype = np.float)
 
@@ -260,7 +265,7 @@ class DataGrid(object):
             # If only other has data, take it
             # (since I don't have anything there, taking it all, including
             # their NaNs, doesn't change anything)
-            grid[~hasdata] = other[varname][~hasdata]
+            grid[~self_has_data] = othergrid[~self_has_data]
 
         return self
 
