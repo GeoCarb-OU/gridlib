@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import netCDF4
 import cartopy.crs as ccrs
 
+class EmptyDatafileError(Exception):
+    pass
+
 class DataGrid(object):
 
     @classmethod
@@ -47,7 +50,9 @@ class DataGrid(object):
         given value for a pixel if more than one.
         """
 
-        assert len(lat) > 0 and len(lon) > 0, "lat and/or lon empty, data points must be provided!"
+        if not (len(lat) > 0 and len(lon) > 0):
+            raise EmptyDatafileError("lat and/or lon are empty!")
+        
         assert len(lat) == len(lon), "lat and lon have different lengths!"
         assert all(len(d) == len(lat) for d in data_arrs), "All data arrays must have same length as number of coordinate pairs!"
 
