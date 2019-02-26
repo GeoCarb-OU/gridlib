@@ -40,8 +40,6 @@ class DataGrid(object):
     @classmethod
     def from_points(kls, lat, lon, data_arrs,
                     pixel_size = np.array([0.5, 0.5]),
-                    origin = None,
-                    grid_dimensions = None,
                     bounding_box = None,
                     **kwargs):
         """Construct a grid from a list of coordinates and data points.
