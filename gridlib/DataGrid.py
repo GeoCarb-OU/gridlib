@@ -48,7 +48,15 @@ class DataGrid(object):
         given value for a pixel if more than one.
 
         Params:
-         - bounding_box (ndarray, float): corners of area
+         - lat/lon (ndarray, float): Latitude and longitude of each data point.
+         - data_arrs (dict, str -> ndarray of float): Names of data points mapped
+            to ndarrays of values corresponding to the lat/lon given. Each ndarray
+            must be of the same length as lat/lon.
+         - pixel_size (ndarray of float, len 2): Size (in degrees, lat then lon)
+            of each gridbox.
+         - bounding_box (ndarray, float): lower-left and upper-right corners of
+            geographic area to consider. Observations/data points outside this
+            box will be ignored.
         """
 
         if not (len(lat) > 0 and len(lon) > 0):
@@ -58,8 +66,6 @@ class DataGrid(object):
         assert all(len(data_arrs[d]) == len(lat) for d in data_arrs), "All data arrays must have same length as number of coordinate pairs!"
 
         pixel_size = np.asarray(pixel_size)
-        grid_dimensions = np.asarray(grid_dimensions, dtype = np.float)
-
         mins = np.array([np.min(lat), np.min(lon)])
         maxes = np.array([np.max(lat), np.max(lon)])
 
