@@ -72,6 +72,7 @@ class DataGrid(object):
         if bounding_box is None:
             bounding_box = np.array([mins, maxes])
         else:
+            bounding_box = np.asarray(bounding_box)
             assert bounding_box.shape == (2,2)
             assert np.all(bounding_box[0] < bounding_box[1])
 
