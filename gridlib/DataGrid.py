@@ -40,14 +40,17 @@ class DataGrid(object):
     @classmethod
     def from_points(kls, lat, lon, data_arrs,
                     pixel_size = np.array([0.5, 0.5]),
-                    dim_mul_of = [1, 1],
                     origin = None,
                     grid_dimensions = None,
+                    bounding_box = None,
                     **kwargs):
         """Construct a grid from a list of coordinates and data points.
 
         ASSUMES that there is only one data point in each pixel; chooses the last
         given value for a pixel if more than one.
+
+        Params:
+         - bounding_box (ndarray, float): corners of area
         """
 
         if not (len(lat) > 0 and len(lon) > 0):
@@ -61,18 +64,24 @@ class DataGrid(object):
 
         mins = np.array([np.min(lat), np.min(lon)])
         maxes = np.array([np.max(lat), np.max(lon)])
-        grid_dim = np.ceil((maxes - mins) / pixel_size)
-        grid_dim = dim_mul_of * np.ceil(grid_dim / dim_mul_of)
 
-        if not grid_dimensions is None:
-            assert np.all(grid_dimensions >= grid_dim), "Provided grid dimensions of %s smaller than data grid size of %s" % (grid_dimensions, grid_dim)
-
-            grid_dim = grid_dimensions
-
-        if origin is None:
-            orgin = mins
+        if bounding_box is None:
+            bounding_box = np.array([mins, maxes])
         else:
-            assert np.all(origin <= mins), "Provided origin %s larger than data mins %s" % (origin, mins)
+            assert bounding_box.shape == (2,2)
+            assert np.all(bounding_box[0] < bounding_box[1])
+
+        origin = bounding_box[0]
+
+        # Filter data to within bounding box
+        geo_mask = (lat >= origin[0]) & (lat <= bounding_box[1][0]) & \
+                   (lon >= origin[1]) & (lon <= bounding_box[1][1])
+
+        lat = lat[geo_mask]
+        lon = lon[geo_mask]
+
+        # Determine grid dimensions
+        grid_dim = np.ceil((bounding_box[1] - bounding_box[0]) / pixel_size)
 
         grid_lat, grid_lon = np.mgrid[0:grid_dim[0], 0:grid_dim[1]]
         grid_lat *= pixel_size[0]
@@ -86,7 +95,7 @@ class DataGrid(object):
         for varname in data_arrs:
             grids[varname] = np.full(grid_lat.shape, np.nan, dtype = np.float)
             grids[varname][np.floor((lat - origin[0]) / pixel_size[0]).astype(int),
-                           np.floor((lon - origin[1]) / pixel_size[1]).astype(int)] = data_arrs[varname]
+                           np.floor((lon - origin[1]) / pixel_size[1]).astype(int)] = data_arrs[varname][geo_mask]
 
         grids['n_samples'] = (~np.isnan(grids[varname])).astype(int)
 
