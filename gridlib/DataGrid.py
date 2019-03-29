@@ -129,7 +129,7 @@ class DataGrid(object):
         return self.data_grids.keys()
 
 
-    def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}, **kwargs):
+    def plot(self, to_show = None, to_hide = None, title = None, figsize = (8, 10), cmaps = {}, vmins = {}, vmaxes = {}, **kwargs):
 
         cmaps_real = {'n_samples' : 'Blues'}
         cmaps_real.update(cmaps)
@@ -153,7 +153,9 @@ class DataGrid(object):
                                    self.grid_lat,
                                    self.data_grids[varname],
                                    transform = ccrs.PlateCarree(),
-                                   cmap = cmaps_real.get(varname, 'inferno'))
+                                   cmap = cmaps_real.get(varname, 'inferno'),
+                                   vmin = vmins.get(varname, None),
+                                   vmax = vmaxes.get(varname, None))
 
             axs[i].coastlines()
             axs[i].set_title(self.pretty_names.get(varname, varname))
